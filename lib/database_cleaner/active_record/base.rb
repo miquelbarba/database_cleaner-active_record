@@ -36,7 +36,11 @@ module DatabaseCleaner
         @connection_class ||= if db && !db.is_a?(Symbol)
                                 db
                               elsif connection_hash
-                                (lookup_from_connection_pool rescue nil) || establish_connection
+                                begin
+                                  lookup_from_connection_pool
+                                rescue StandardError
+                                  nil
+                                end || establish_connection
                               else
                                 ::ActiveRecord::Base
                               end
@@ -46,7 +50,8 @@ module DatabaseCleaner
 
       def load_config
         if db != :default && db.is_a?(Symbol) && File.file?(DatabaseCleaner::ActiveRecord.config_file_location)
-          connection_details = YAML::load(ERB.new(IO.read(DatabaseCleaner::ActiveRecord.config_file_location)).result)
+          yaml_config = ERB.new(IO.read(DatabaseCleaner::ActiveRecord.config_file_location)).result
+          connection_details = YAML.respond_to?(:unsafe_load) ? YAML.unsafe_load(yaml_config) : YAML.load(yaml_config)
           @connection_hash   = valid_config(connection_details, db.to_s)
         end
       end
